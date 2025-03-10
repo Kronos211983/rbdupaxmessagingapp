@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Online Messaging App</title>
+</head>
+<body>
+  <h1>Online Messaging App</h1>
+  <div id="messages" style="height: 300px; overflow-y: scroll; border: 1px solid #ccc; padding: 10px;"></div>
+  <input type="text" id="messageInput" placeholder="Type a message">
+  <button onclick="sendMessage()">Send</button>
+
+  <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+  <script>
+    const socket = io('http://localhost:5000'); // Connect to the backend
+
+    // Display received messages
+    socket.on('receiveMessage', (message) => {
+      const messagesDiv = document.getElementById('messages');
+      messagesDiv.innerHTML += `<p>${message}</p>`;
+      messagesDiv.scrollTop = messagesDiv.scrollHeight; // Auto-scroll to the latest message
+    });
+
+    // Send a message
+    function sendMessage() {
+      const input = document.getElementById('messageInput');
+      const message = input.value;
+      if (message.trim()) {
+        socket.emit('sendMessage', message); // Send the message to the server
+        input.value = ''; // Clear the input field
+      }
+    }
+  </script>
+</body>
+</html>
