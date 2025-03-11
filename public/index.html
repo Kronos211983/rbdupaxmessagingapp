@@ -4,14 +4,43 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Messaging App</title>
-    <script defer src="/socket.io/socket.io.js"></script>
-    <script defer src="script.js"></script>
 </head>
 <body>
-    <h1>Welcome to the Messaging App</h1>
-    <input type="text" id="username" placeholder="Enter your name">
+    <h2>Chat App</h2>
+    <div id="chat-box"></div>
+    <input type="text" id="sender" placeholder="Your Name">
     <input type="text" id="message" placeholder="Type a message">
     <button onclick="sendMessage()">Send</button>
-    <ul id="messages"></ul>
+
+    <script src="https://cdn.socket.io/4.0.1/socket.io.min.js"></script>
+    <script>
+        const socket = io();
+        const chatBox = document.getElementById("chat-box");
+
+        socket.on("messageHistory", (messages) => {
+            messages.forEach(msg => displayMessage(msg.sender, msg.content));
+        });
+
+        socket.on("newMessage", (msg) => {
+            displayMessage(msg.sender, msg.content);
+        });
+
+        function sendMessage() {
+            const sender = document.getElementById("sender").value;
+            const content = document.getElementById("message").value;
+            if (!sender || !content) {
+                alert("Both sender and message are required!");
+                return;
+            }
+            socket.emit("sendMessage", { sender, content });
+            document.getElementById("message").value = "";
+        }
+
+        function displayMessage(sender, content) {
+            const p = document.createElement("p");
+            p.textContent = `${sender}: ${content}`;
+            chatBox.appendChild(p);
+        }
+    </script>
 </body>
 </html>

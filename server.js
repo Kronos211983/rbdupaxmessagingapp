@@ -1,22 +1,23 @@
+// Load Environment Variables
 require("dotenv").config();
+
 const express = require("express");
 const mongoose = require("mongoose");
 const cors = require("cors");
 const { Server } = require("socket.io");
 const http = require("http");
-const path = require("path");
 
 // Initialize Express App
 const app = express();
 const PORT = process.env.PORT || 5000;
 
 // Middleware
-app.use(express.json());
-app.use(cors());
-app.use(express.static(path.join(__dirname, "public"))); // Serve static frontend
+app.use(express.json()); // JSON parser
+app.use(cors()); // Allow frontend & mobile access
 
-// ✅ Connect to MongoDB Atlas
+// ✅ Secure MongoDB Connection
 const MONGO_URI = process.env.MONGODB_URI;
+
 if (!MONGO_URI) {
     console.error("❌ MongoDB URI is missing! Check your .env file.");
     process.exit(1);
@@ -38,15 +39,10 @@ const messageSchema = new mongoose.Schema({
 
 const Message = mongoose.model("Message", messageSchema);
 
-// ✅ Serve Frontend HTML
-app.get("/", (req, res) => {
-    res.sendFile(path.join(__dirname, "public", "index.html"));
-});
-
 // ✅ API Endpoint: Get All Messages
 app.get("/messages", async (req, res) => {
     try {
-        const messages = await Message.find().sort({ timestamp: -1 });
+        const messages = await Message.find().sort({ timestamp: -1 }); // Latest first
         res.json(messages);
     } catch (error) {
         console.error("❌ Error fetching messages:", error);
@@ -65,7 +61,7 @@ app.post("/messages", async (req, res) => {
         const newMessage = new Message({ sender, content });
         await newMessage.save();
 
-        io.emit("newMessage", newMessage);
+        io.emit("newMessage", newMessage); // Notify all connected users
         res.status(201).json({ message: "Message sent successfully!", newMessage });
     } catch (error) {
         console.error("❌ Error sending message:", error);
@@ -80,10 +76,12 @@ const io = new Server(server, { cors: { origin: "*" } });
 io.on("connection", (socket) => {
     console.log(`🔵 A user connected: ${socket.id}`);
 
+    // ✅ Send last 50 messages when a user connects
     Message.find().sort({ timestamp: -1 }).limit(50).then((messages) => {
-        socket.emit("messageHistory", messages.reverse());
+        socket.emit("messageHistory", messages.reverse()); // Send in correct order
     }).catch((err) => console.error("❌ Error fetching chat history:", err));
 
+    // ✅ Handle message sending
     socket.on("sendMessage", async (data) => {
         console.log("📩 Message received:", data);
 
@@ -95,7 +93,7 @@ io.on("connection", (socket) => {
         try {
             const message = new Message({ sender: data.sender, content: data.content });
             await message.save();
-            io.emit("newMessage", message);
+            io.emit("newMessage", message); // Broadcast message to all clients
             console.log("✅ Message saved:", message);
         } catch (error) {
             console.error("❌ Error saving message:", error);
@@ -105,6 +103,11 @@ io.on("connection", (socket) => {
     socket.on("disconnect", () => {
         console.log(`🔴 A user disconnected: ${socket.id}`);
     });
+});
+
+// ✅ Root Route for Testing
+app.get("/", (req, res) => {
+    res.sendFile(__dirname + "/index.html");
 });
 
 // ✅ Start Server

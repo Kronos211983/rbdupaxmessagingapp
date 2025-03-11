@@ -13,15 +13,21 @@
   },
   "dependencies": {
     "cors": "^2.8.5",
-    "dotenv": "^16.0.3",
+    "dotenv": "^16.4.7",
     "express": "^4.18.2",
-    "mongoose": "^7.0.0",
+    "mongoose": "^7.8.6",
     "socket.io": "^4.5.4"
   },
   "devDependencies": {
     "nodemon": "^3.0.0"
   },
-  "keywords": ["messaging", "chat", "socket.io", "express", "mongodb"],
+  "keywords": [
+    "messaging",
+    "chat",
+    "socket.io",
+    "express",
+    "mongodb"
+  ],
   "author": "Your Name",
   "license": "MIT"
 }
