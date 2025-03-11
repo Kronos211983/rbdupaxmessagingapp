@@ -4,51 +4,37 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Messaging App</title>
-    <style>
-        body { font-family: Arial, sans-serif; margin: 20px; padding: 20px; text-align: center; }
-        #messages { border: 1px solid #ddd; padding: 10px; height: 300px; overflow-y: scroll; margin-bottom: 20px; }
-        input, button { padding: 10px; margin: 5px; }
-    </style>
+    <script src="https://cdn.socket.io/4.0.1/socket.io.min.js"></script>
 </head>
 <body>
     <h1>Messaging App</h1>
-    
-    <div id="messages"></div>
-
-    <input type="text" id="sender" placeholder="Enter your name">
-    <input type="text" id="message" placeholder="Type a message">
+    <input id="sender" type="text" placeholder="Your Name">
+    <input id="message" type="text" placeholder="Type a message">
     <button onclick="sendMessage()">Send</button>
+    <ul id="messages"></ul>
 
     <script>
-        async function fetchMessages() {
-            const response = await fetch('/messages');
-            const messages = await response.json();
-            document.getElementById("messages").innerHTML = messages
-                .map(msg => `<p><strong>${msg.sender}:</strong> ${msg.content}</p>`)
-                .join('');
-        }
+        const socket = io("http://192.168.1.8:5000");
 
-        async function sendMessage() {
+        function sendMessage() {
             const sender = document.getElementById("sender").value;
             const content = document.getElementById("message").value;
 
-            if (!sender || !content) {
-                alert("Please enter both name and message!");
-                return;
+            if (sender && content) {
+                fetch("http://192.168.1.8:5000/messages", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ sender, content })
+                }).then(response => response.json())
+                .then(data => console.log("Message sent:", data));
             }
-
-            await fetch('/messages', {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ sender, content })
-            });
-
-            document.getElementById("message").value = "";
-            fetchMessages();
         }
 
-        setInterval(fetchMessages, 3000); // Refresh messages every 3 seconds
-        fetchMessages();
+        socket.on("newMessage", (message) => {
+            const li = document.createElement("li");
+            li.textContent = `${message.sender}: ${message.content}`;
+            document.getElementById("messages").appendChild(li);
+        });
     </script>
 </body>
 </html>

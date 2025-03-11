@@ -1,39 +1,47 @@
 require("dotenv").config();
 const express = require("express");
+const http = require("http");
 const mongoose = require("mongoose");
-const path = require("path");
 const cors = require("cors");
+const socketIo = require("socket.io");
 
+// 🔹 Express App & Server Setup
 const app = express();
-const PORT = process.env.PORT || 5000;
+const server = http.createServer(app);
+const io = socketIo(server, {
+    cors: {
+        origin: "*",
+        methods: ["GET", "POST"]
+    }
+});
 
-// Middleware
-app.use(express.json());
+// 🔹 Middleware
 app.use(cors());
+app.use(express.json());
 
-// ✅ Serve Static Files from "public" Directory
-app.use(express.static(path.join(__dirname, "public")));
+// 🔹 MongoDB Compass Connection
+const MONGO_URI = "mongodb://localhost:27017/messagingapp";  // Replace with your local database name
 
-// ✅ MongoDB Connection
-const MONGO_URI = process.env.MONGODB_URI || "mongodb://localhost:27017/messagingapp";
+mongoose.connect(MONGO_URI, {
+    useNewUrlParser: true,
+    useUnifiedTopology: true
+}).then(() => {
+    console.log("✅ Connected to MongoDB (Local Compass)");
+}).catch(err => {
+    console.error("❌ MongoDB connection error:", err);
+    process.exit(1);
+});
 
-mongoose
-    .connect(MONGO_URI, { useNewUrlParser: true, useUnifiedTopology: true })
-    .then(() => console.log("✅ Connected to MongoDB"))
-    .catch((err) => {
-        console.error("❌ MongoDB connection error:", err);
-        process.exit(1);
-    });
-
-// ✅ Message Schema & Model
-const MessageSchema = new mongoose.Schema({
+// 🔹 Message Schema & Model
+const messageSchema = new mongoose.Schema({
     sender: String,
     content: String,
     timestamp: { type: Date, default: Date.now }
 });
-const Message = mongoose.model("Message", MessageSchema);
 
-// ✅ Get Messages API
+const Message = mongoose.model("Message", messageSchema);
+
+// 🔹 API Route to Fetch Messages
 app.get("/messages", async (req, res) => {
     try {
         const messages = await Message.find().sort({ timestamp: -1 });
@@ -44,28 +52,53 @@ app.get("/messages", async (req, res) => {
     }
 });
 
-// ✅ Post Message API
+// 🔹 API Route to Send Messages
 app.post("/messages", async (req, res) => {
     try {
         const { sender, content } = req.body;
         if (!sender || !content) {
-            return res.status(400).json({ error: "Sender and content are required." });
+            return res.status(400).json({ error: "Sender and content are required!" });
         }
-        const message = new Message({ sender, content });
-        await message.save();
-        res.status(201).json(message);
+
+        const newMessage = new Message({ sender, content });
+        await newMessage.save();
+
+        // Emit message to all connected clients
+        io.emit("newMessage", newMessage);
+        res.status(201).json(newMessage);
     } catch (error) {
-        console.error("❌ Error saving message:", error);
+        console.error("❌ Error sending message:", error);
         res.status(500).json({ error: "Internal Server Error" });
     }
 });
 
-// ✅ Serve `index.html` for All Routes
-app.get("*", (req, res) => {
-    res.sendFile(path.join(__dirname, "public", "index.html"));
+// 🔹 WebSocket Connection for Real-Time Chat
+io.on("connection", (socket) => {
+    console.log("🔵 A user connected:", socket.id);
+
+    socket.on("sendMessage", async (data) => {
+        try {
+            const { sender, content } = data;
+            if (!sender || !content) {
+                console.log("❌ Validation Error: sender and content are required.");
+                return;
+            }
+
+            const newMessage = new Message({ sender, content });
+            await newMessage.save();
+            io.emit("newMessage", newMessage);
+        } catch (error) {
+            console.error("❌ Error handling WebSocket message:", error);
+        }
+    });
+
+    socket.on("disconnect", () => {
+        console.log("🔴 A user disconnected:", socket.id);
+    });
 });
 
-// Start Server
-app.listen(PORT, () => {
-    console.log(`🚀 Server is running on port ${PORT}`);
+// 🔹 Start Server on Local Network (192.168.1.8)
+const PORT = 5000;
+server.listen(PORT, "192.168.1.8", () => {
+    console.log(`🚀 Server is running on http://192.168.1.8:${PORT}`);
 });
