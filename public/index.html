@@ -4,37 +4,44 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Messaging App</title>
-    <script src="https://cdn.socket.io/4.0.1/socket.io.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.4.1/socket.io.js"></script>
 </head>
 <body>
-    <h1>Messaging App</h1>
-    <input id="sender" type="text" placeholder="Your Name">
-    <input id="message" type="text" placeholder="Type a message">
-    <button onclick="sendMessage()">Send</button>
+    <h2>Chat Messages</h2>
     <ul id="messages"></ul>
+    
+    <input type="text" id="sender" placeholder="Your Name">
+    <input type="text" id="message" placeholder="Type a message...">
+    <button onclick="sendMessage()">Send</button>
 
     <script>
         const socket = io("http://192.168.1.8:5000");
+        const messagesList = document.getElementById("messages");
+
+        socket.on("newMessage", (message) => {
+            const li = document.createElement("li");
+            li.textContent = `${message.sender}: ${message.content}`;
+            messagesList.appendChild(li);
+        });
 
         function sendMessage() {
             const sender = document.getElementById("sender").value;
             const content = document.getElementById("message").value;
 
-            if (sender && content) {
-                fetch("http://192.168.1.8:5000/messages", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ sender, content })
-                }).then(response => response.json())
-                .then(data => console.log("Message sent:", data));
+            if (!sender || !content) {
+                alert("Sender and message content are required!");
+                return;
             }
-        }
 
-        socket.on("newMessage", (message) => {
-            const li = document.createElement("li");
-            li.textContent = `${message.sender}: ${message.content}`;
-            document.getElementById("messages").appendChild(li);
-        });
+            fetch("/messages", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ sender, content })
+            }).then(response => response.json())
+              .then(data => {
+                  socket.emit("sendMessage", data);
+              });
+        }
     </script>
 </body>
 </html>

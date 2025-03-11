@@ -1,47 +1,43 @@
-require("dotenv").config();
 const express = require("express");
 const http = require("http");
 const mongoose = require("mongoose");
 const cors = require("cors");
-const socketIo = require("socket.io");
+const dotenv = require("dotenv");
+const { Server } = require("socket.io");
 
-// 🔹 Express App & Server Setup
+dotenv.config();
+
 const app = express();
 const server = http.createServer(app);
-const io = socketIo(server, {
-    cors: {
-        origin: "*",
-        methods: ["GET", "POST"]
-    }
-});
 
-// 🔹 Middleware
-app.use(cors());
-app.use(express.json());
+const PORT = process.env.PORT || 5000;
+const HOST = "192.168.1.8"; // Your local IP for LAN access
 
-// 🔹 MongoDB Compass Connection
-const MONGO_URI = "mongodb://localhost:27017/messagingapp";  // Replace with your local database name
-
-mongoose.connect(MONGO_URI, {
+// MongoDB Connection
+mongoose.connect(process.env.MONGODB_URI, {
     useNewUrlParser: true,
     useUnifiedTopology: true
 }).then(() => {
-    console.log("✅ Connected to MongoDB (Local Compass)");
+    console.log("✅ Connected to MongoDB Compass");
 }).catch(err => {
     console.error("❌ MongoDB connection error:", err);
     process.exit(1);
 });
 
-// 🔹 Message Schema & Model
-const messageSchema = new mongoose.Schema({
+// Middleware
+app.use(express.json());
+app.use(cors());
+app.use(express.static("public")); // Serve static HTML file
+
+// Message Schema
+const MessageSchema = new mongoose.Schema({
     sender: String,
     content: String,
     timestamp: { type: Date, default: Date.now }
 });
+const Message = mongoose.model("Message", MessageSchema);
 
-const Message = mongoose.model("Message", messageSchema);
-
-// 🔹 API Route to Fetch Messages
+// API Routes
 app.get("/messages", async (req, res) => {
     try {
         const messages = await Message.find().sort({ timestamp: -1 });
@@ -52,53 +48,50 @@ app.get("/messages", async (req, res) => {
     }
 });
 
-// 🔹 API Route to Send Messages
 app.post("/messages", async (req, res) => {
+    const { sender, content } = req.body;
+    if (!sender || !content) {
+        return res.status(400).json({ error: "Sender and content are required." });
+    }
     try {
-        const { sender, content } = req.body;
-        if (!sender || !content) {
-            return res.status(400).json({ error: "Sender and content are required!" });
-        }
-
         const newMessage = new Message({ sender, content });
         await newMessage.save();
-
-        // Emit message to all connected clients
-        io.emit("newMessage", newMessage);
         res.status(201).json(newMessage);
     } catch (error) {
-        console.error("❌ Error sending message:", error);
-        res.status(500).json({ error: "Internal Server Error" });
+        console.error("❌ Error saving message:", error);
+        res.status(500).json({ error: "Could not save message" });
     }
 });
 
-// 🔹 WebSocket Connection for Real-Time Chat
+// Serve HTML file
+app.get("/", (req, res) => {
+    res.sendFile(__dirname + "/public/index.html");
+});
+
+// WebSocket Setup
+const io = new Server(server, {
+    cors: {
+        origin: "*",
+        methods: ["GET", "POST"]
+    }
+});
+
 io.on("connection", (socket) => {
-    console.log("🔵 A user connected:", socket.id);
+    console.log(`🔵 A user connected: ${socket.id}`);
 
     socket.on("sendMessage", async (data) => {
-        try {
-            const { sender, content } = data;
-            if (!sender || !content) {
-                console.log("❌ Validation Error: sender and content are required.");
-                return;
-            }
-
-            const newMessage = new Message({ sender, content });
-            await newMessage.save();
-            io.emit("newMessage", newMessage);
-        } catch (error) {
-            console.error("❌ Error handling WebSocket message:", error);
-        }
+        console.log(`📩 Message received: ${data.content}`);
+        const newMessage = new Message({ sender: data.sender, content: data.content });
+        await newMessage.save();
+        io.emit("newMessage", newMessage);
     });
 
     socket.on("disconnect", () => {
-        console.log("🔴 A user disconnected:", socket.id);
+        console.log(`🔴 A user disconnected: ${socket.id}`);
     });
 });
 
-// 🔹 Start Server on Local Network (192.168.1.8)
-const PORT = 5000;
-server.listen(PORT, "192.168.1.8", () => {
-    console.log(`🚀 Server is running on http://192.168.1.8:${PORT}`);
+// Start server
+server.listen(PORT, HOST, () => {
+    console.log(`🚀 Server is running on http://${HOST}:${PORT}`);
 });
