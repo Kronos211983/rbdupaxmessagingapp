@@ -1,36 +1,116 @@
-const express = require('express');
-const http = require('http');
-const { Server } = require('socket.io');
-const cors = require('cors');
-const path = require('path');
+// Load Environment Variables
+require("dotenv").config();
 
+const express = require("express");
+const mongoose = require("mongoose");
+const cors = require("cors");
+const { Server } = require("socket.io");
+const http = require("http");
+
+// Initialize Express App
 const app = express();
-const server = http.createServer(app);
-const io = new Server(server, { cors: { origin: '*' } });
+const PORT = process.env.PORT || 5000;
 
-// Serve static files from the "public" folder
-app.use(express.static(path.join(__dirname, 'public')));
+// Middleware
+app.use(express.json()); // JSON parser
+app.use(cors()); // Allow frontend & mobile access
 
-// Socket.IO connection handler
-io.on('connection', (socket) => {
-  console.log('A user connected:', socket.id);
+// ✅ MongoDB Connection
+const MONGO_URI = process.env.MONGODB_URI;
 
-  // Listen for "sendMessage" event from the client
-  socket.on('sendMessage', (message) => {
-    console.log('Message received:', message);
+if (!MONGO_URI) {
+    console.error("❌ MongoDB URI is missing! Check your .env file.");
+    process.exit(1);
+}
 
-    // Broadcast the message to all connected clients
-    io.emit('receiveMessage', message);
-  });
+mongoose.connect(MONGO_URI, { useNewUrlParser: true, useUnifiedTopology: true })
+    .then(() => console.log("✅ Connected to MongoDB Atlas"))
+    .catch(err => {
+        console.error("❌ MongoDB connection error:", err);
+        process.exit(1);
+    });
 
-  // Handle user disconnection
-  socket.on('disconnect', () => {
-    console.log('A user disconnected:', socket.id);
-  });
+// ✅ Define Message Schema & Model
+const messageSchema = new mongoose.Schema({
+    sender: { type: String, required: true },
+    content: { type: String, required: true },
+    timestamp: { type: Date, default: Date.now }
 });
 
-// Start the server
-const PORT = process.env.PORT || 5000;
+const Message = mongoose.model("Message", messageSchema);
+
+// ✅ API Endpoint: Get All Messages
+app.get("/messages", async (req, res) => {
+    try {
+        const messages = await Message.find().sort({ timestamp: -1 });
+        res.json(messages);
+    } catch (error) {
+        console.error("❌ Error fetching messages:", error);
+        res.status(500).json({ error: "Internal Server Error" });
+    }
+});
+
+// ✅ API Endpoint: Send a Message (For Testing)
+app.post("/messages", async (req, res) => {
+    try {
+        const { sender, content } = req.body;
+        if (!sender || !content) {
+            return res.status(400).json({ error: "Both sender and content are required" });
+        }
+
+        const newMessage = new Message({ sender, content });
+        await newMessage.save();
+
+        io.emit("newMessage", newMessage); // Notify all connected users
+        res.status(201).json({ message: "Message sent successfully!", newMessage });
+    } catch (error) {
+        console.error("❌ Error sending message:", error);
+        res.status(500).json({ error: "Internal Server Error" });
+    }
+});
+
+// ✅ WebSocket (Socket.IO) Setup
+const server = http.createServer(app);
+const io = new Server(server, { cors: { origin: "*" } });
+
+io.on("connection", (socket) => {
+    console.log(`🔵 A user connected: ${socket.id}`);
+
+    // ✅ Send last 50 messages when a user connects
+    Message.find().sort({ timestamp: -1 }).limit(50).then((messages) => {
+        socket.emit("messageHistory", messages.reverse()); // Send in correct order
+    }).catch((err) => console.error("❌ Error fetching chat history:", err));
+
+    // ✅ Handle message sending
+    socket.on("sendMessage", async (data) => {
+        console.log("📩 Message received:", data);
+
+        if (!data.sender || !data.content) {
+            console.error("❌ Validation Error: sender and content are required.");
+            return;
+        }
+
+        try {
+            const message = new Message({ sender: data.sender, content: data.content });
+            await message.save();
+            io.emit("newMessage", message); // Broadcast message to all clients
+            console.log("✅ Message saved:", message);
+        } catch (error) {
+            console.error("❌ Error saving message:", error);
+        }
+    });
+
+    socket.on("disconnect", () => {
+        console.log(`🔴 A user disconnected: ${socket.id}`);
+    });
+});
+
+// ✅ Root Route for Testing
+app.get("/", (req, res) => {
+    res.send("🚀 Messaging App Backend is running!");
+});
+
+// ✅ Start Server
 server.listen(PORT, () => {
-  console.log(`Server is running on port ${PORT}`);
+    console.log(`🚀 Server is running on port ${PORT}`);
 });

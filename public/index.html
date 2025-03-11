@@ -4,32 +4,97 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Online Messaging App</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      background-color: #f4f4f9;
+    }
+    h1 {
+      color: #333;
+    }
+    #messages {
+      width: 400px;
+      height: 300px;
+      overflow-y: scroll;
+      border: 1px solid #ccc;
+      padding: 10px;
+      background-color: #fff;
+      margin-bottom: 10px;
+    }
+    #messageInput, #usernameInput {
+      width: 380px;
+      padding: 10px;
+      font-size: 16px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      margin-bottom: 5px;
+    }
+    button {
+      padding: 10px 20px;
+      font-size: 16px;
+      background-color: #007bff;
+      color: #fff;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      margin-top: 10px;
+    }
+    button:hover {
+      background-color: #0056b3;
+    }
+  </style>
 </head>
 <body>
   <h1>Online Messaging App</h1>
-  <div id="messages" style="height: 300px; overflow-y: scroll; border: 1px solid #ccc; padding: 10px;"></div>
+  <input type="text" id="usernameInput" placeholder="Enter your name">
+  <div id="messages"></div>
   <input type="text" id="messageInput" placeholder="Type a message">
   <button onclick="sendMessage()">Send</button>
 
   <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
   <script>
-    const socket = io('http://localhost:5000'); // Connect to the backend
+    // Connect to the backend
+    const socket = io('https://your-app-name.onrender.com'); // Replace with your backend URL
 
     // Display received messages
-    socket.on('receiveMessage', (message) => {
+    socket.on('newMessage', (message) => {
       const messagesDiv = document.getElementById('messages');
-      messagesDiv.innerHTML += `<p>${message}</p>`;
+      messagesDiv.innerHTML += `<p><strong>${message.sender}:</strong> ${message.content}</p>`;
       messagesDiv.scrollTop = messagesDiv.scrollHeight; // Auto-scroll to the latest message
+    });
+
+    // Display message history
+    socket.on('messageHistory', (messages) => {
+      const messagesDiv = document.getElementById('messages');
+      messages.forEach((message) => {
+        messagesDiv.innerHTML += `<p><strong>${message.sender}:</strong> ${message.content}</p>`;
+      });
     });
 
     // Send a message
     function sendMessage() {
-      const input = document.getElementById('messageInput');
-      const message = input.value;
-      if (message.trim()) {
-        socket.emit('sendMessage', message); // Send the message to the server
-        input.value = ''; // Clear the input field
+      const username = document.getElementById('usernameInput').value.trim();
+      const messageText = document.getElementById('messageInput').value.trim();
+
+      if (!username || !messageText) {
+        alert("Both username and message are required!");
+        return;
       }
+
+      const message = {
+        sender: username,
+        content: messageText,
+      };
+
+      socket.emit('sendMessage', message); // Send message to server
+      document.getElementById('messageInput').value = ''; // Clear input
     }
   </script>
 </body>
