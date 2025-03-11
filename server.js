@@ -15,12 +15,12 @@ const PORT = process.env.PORT || 5000;
 app.use(express.json()); // JSON parser
 app.use(cors()); // Allow frontend & mobile access
 
-// ✅ MongoDB Connection
+// ✅ MongoDB Atlas Connection
 const MONGO_URI = process.env.MONGODB_URI;
 
 if (!MONGO_URI) {
     console.error("❌ MongoDB URI is missing! Check your .env file.");
-    process.exit(1);
+    process.exit(1); // Stop execution if URI is missing
 }
 
 mongoose.connect(MONGO_URI, { useNewUrlParser: true, useUnifiedTopology: true })
@@ -42,7 +42,7 @@ const Message = mongoose.model("Message", messageSchema);
 // ✅ API Endpoint: Get All Messages
 app.get("/messages", async (req, res) => {
     try {
-        const messages = await Message.find().sort({ timestamp: -1 });
+        const messages = await Message.find().sort({ timestamp: 1 });
         res.json(messages);
     } catch (error) {
         console.error("❌ Error fetching messages:", error);
@@ -50,7 +50,7 @@ app.get("/messages", async (req, res) => {
     }
 });
 
-// ✅ API Endpoint: Send a Message (For Testing)
+// ✅ API Endpoint: Send a Message
 app.post("/messages", async (req, res) => {
     try {
         const { sender, content } = req.body;
@@ -61,7 +61,7 @@ app.post("/messages", async (req, res) => {
         const newMessage = new Message({ sender, content });
         await newMessage.save();
 
-        io.emit("newMessage", newMessage); // Notify all connected users
+        io.emit("newMessage", newMessage); // Notify all users
         res.status(201).json({ message: "Message sent successfully!", newMessage });
     } catch (error) {
         console.error("❌ Error sending message:", error);
@@ -93,7 +93,7 @@ io.on("connection", (socket) => {
         try {
             const message = new Message({ sender: data.sender, content: data.content });
             await message.save();
-            io.emit("newMessage", message); // Broadcast message to all clients
+            io.emit("newMessage", message); // Broadcast to all users
             console.log("✅ Message saved:", message);
         } catch (error) {
             console.error("❌ Error saving message:", error);

@@ -28,13 +28,12 @@
       background-color: #fff;
       margin-bottom: 10px;
     }
-    #messageInput, #usernameInput {
+    #messageInput {
       width: 380px;
       padding: 10px;
       font-size: 16px;
       border: 1px solid #ccc;
       border-radius: 4px;
-      margin-bottom: 5px;
     }
     button {
       padding: 10px 20px;
@@ -53,21 +52,21 @@
 </head>
 <body>
   <h1>Online Messaging App</h1>
-  <input type="text" id="usernameInput" placeholder="Enter your name">
   <div id="messages"></div>
+  <input type="text" id="username" placeholder="Enter your name">
   <input type="text" id="messageInput" placeholder="Type a message">
   <button onclick="sendMessage()">Send</button>
 
   <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
   <script>
-    // Connect to the backend
-    const socket = io('https://your-app-name.onrender.com'); // Replace with your backend URL
+    // Connect to the Render backend
+    const socket = io('https://your-render-app-url'); // Replace with your Render backend URL
 
     // Display received messages
     socket.on('newMessage', (message) => {
       const messagesDiv = document.getElementById('messages');
       messagesDiv.innerHTML += `<p><strong>${message.sender}:</strong> ${message.content}</p>`;
-      messagesDiv.scrollTop = messagesDiv.scrollHeight; // Auto-scroll to the latest message
+      messagesDiv.scrollTop = messagesDiv.scrollHeight; // Auto-scroll to latest message
     });
 
     // Display message history
@@ -80,21 +79,17 @@
 
     // Send a message
     function sendMessage() {
-      const username = document.getElementById('usernameInput').value.trim();
-      const messageText = document.getElementById('messageInput').value.trim();
+      const username = document.getElementById('username').value.trim();
+      const input = document.getElementById('messageInput');
 
-      if (!username || !messageText) {
+      if (!username || !input.value.trim()) {
         alert("Both username and message are required!");
         return;
       }
 
-      const message = {
-        sender: username,
-        content: messageText,
-      };
-
-      socket.emit('sendMessage', message); // Send message to server
-      document.getElementById('messageInput').value = ''; // Clear input
+      const message = { sender: username, content: input.value.trim() };
+      socket.emit('sendMessage', message);
+      input.value = ''; // Clear input field
     }
   </script>
 </body>
