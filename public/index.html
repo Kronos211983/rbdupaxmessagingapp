@@ -4,43 +4,51 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Messaging App</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; padding: 20px; text-align: center; }
+        #messages { border: 1px solid #ddd; padding: 10px; height: 300px; overflow-y: scroll; margin-bottom: 20px; }
+        input, button { padding: 10px; margin: 5px; }
+    </style>
 </head>
 <body>
-    <h2>Chat App</h2>
-    <div id="chat-box"></div>
-    <input type="text" id="sender" placeholder="Your Name">
+    <h1>Messaging App</h1>
+    
+    <div id="messages"></div>
+
+    <input type="text" id="sender" placeholder="Enter your name">
     <input type="text" id="message" placeholder="Type a message">
     <button onclick="sendMessage()">Send</button>
 
-    <script src="https://cdn.socket.io/4.0.1/socket.io.min.js"></script>
     <script>
-        const socket = io();
-        const chatBox = document.getElementById("chat-box");
+        async function fetchMessages() {
+            const response = await fetch('/messages');
+            const messages = await response.json();
+            document.getElementById("messages").innerHTML = messages
+                .map(msg => `<p><strong>${msg.sender}:</strong> ${msg.content}</p>`)
+                .join('');
+        }
 
-        socket.on("messageHistory", (messages) => {
-            messages.forEach(msg => displayMessage(msg.sender, msg.content));
-        });
-
-        socket.on("newMessage", (msg) => {
-            displayMessage(msg.sender, msg.content);
-        });
-
-        function sendMessage() {
+        async function sendMessage() {
             const sender = document.getElementById("sender").value;
             const content = document.getElementById("message").value;
+
             if (!sender || !content) {
-                alert("Both sender and message are required!");
+                alert("Please enter both name and message!");
                 return;
             }
-            socket.emit("sendMessage", { sender, content });
+
+            await fetch('/messages', {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ sender, content })
+            });
+
             document.getElementById("message").value = "";
+            fetchMessages();
         }
 
-        function displayMessage(sender, content) {
-            const p = document.createElement("p");
-            p.textContent = `${sender}: ${content}`;
-            chatBox.appendChild(p);
-        }
+        setInterval(fetchMessages, 3000); // Refresh messages every 3 seconds
+        fetchMessages();
     </script>
 </body>
 </html>
